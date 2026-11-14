@@ -414,9 +414,12 @@ func (s *Server) interceptSetToolConfig(w http.ResponseWriter, r *http.Request) 
 // --- LLM fallback judge config (global model fallback) ---
 
 // interceptGetJudgeConfig returns the resolved judge configuration. Prompt is the
-// effective prompt (built-in template when unset), so the UI can prefill it.
+// effective prompt (built-in template when unset), so the UI can prefill it. The
+// TypeSafe key is write-only: only its hint and a "set" flag go back.
 func (s *Server) interceptGetJudgeConfig(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, s.m.interceptor.GetJudgeConfig())
+	c := s.m.interceptor.GetJudgeConfig()
+	c.TypeSafeAPIKey = ""
+	writeJSON(w, 200, c)
 }
 
 // interceptSetJudgeConfig persists the judge configuration.
@@ -424,6 +427,14 @@ func (s *Server) interceptSetJudgeConfig(w http.ResponseWriter, r *http.Request)
 	var req intercept.JudgeConfig
 	if err := decode(r, &req); err != nil {
 		writeErr(w, 400, err.Error())
+		return
+	}
+	switch req.Backend {
+	case "", intercept.JudgeBackendLLM:
+		req.Backend = intercept.JudgeBackendLLM
+	case intercept.JudgeBackendTypeSafe:
+	default:
+		writeErr(w, 400, "backend must be llm or typesafe")
 		return
 	}
 	switch req.FailAction {
@@ -437,6 +448,13 @@ func (s *Server) interceptSetJudgeConfig(w http.ResponseWriter, r *http.Request)
 	default:
 		writeErr(w, 400, "ask_timeout_action must be allow or deny")
 		return
+	}
+	if req.TypeSafeBaseURL != "" {
+		u, err := url.Parse(req.TypeSafeBaseURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			writeErr(w, 400, "typesafe_base_url must be an absolute http(s) URL")
+			return
+		}
 	}
 	if err := s.m.interceptor.SetJudgeConfig(req); err != nil {
 		writeErr(w, 500, err.Error())

@@ -55,6 +55,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
+# Wireless / WPA toolchain. The container has no radio of its own, so capture runs
+# outside (host adapter or a Kali VM) and the .cap/.pcapng/.22000 is uploaded; these
+# tools cover the offline half: conversion (hcxtools), cracking (hashcat/aircrack-ng),
+# WPS (reaver/wash) and analysis (tshark). pocl gives hashcat a CPU OpenCL device.
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      aircrack-ng hashcat hcxtools hcxdumptool reaver tshark iw wireless-tools macchanger pocl-opencl-icd ocl-icd-libopencl1 \
+    && rm -rf /var/lib/apt/lists/*
+RUN hashcat --version >/dev/null && aircrack-ng --help >/dev/null 2>&1 || true
+
 # Web-recon toolbox (drost-community take 1, #100): pinned release binaries installed
 # into /usr/local/bin so hunt workers can run them directly through their Bash tool.
 # Versions pinned per tool; upgrade deliberately. sqlmap is a python checkout (no
@@ -95,11 +105,19 @@ RUN set -eux; \
 # preinstalled (--install-all-deps) so scans never need pip at runtime, which
 # would fail under a program's egress allowlist.
 ARG BBOT_VERSION=3.0.2
+# bbot's own chrome download is an x86-64 ELF, which needs Rosetta on Apple
+# Silicon and fails its --version probe there. Install the distro chromium
+# (native) and point bbot's chrome path at it after the deps step.
 RUN set -eux; \
+    apt-get update && apt-get install -y --no-install-recommends chromium fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*; \
     python -m venv /opt/bbot; \
     /opt/bbot/bin/pip install --no-cache-dir "bbot==${BBOT_VERSION}"; \
     ln -s /opt/bbot/bin/bbot /usr/local/bin/bbot; \
-    bbot -y --install-all-deps; \
+    bbot -y --install-all-deps || true; \
+    rm -rf /root/.bbot/tools/chrome-linux; \
+    mkdir -p /root/.bbot/tools/chrome-linux; \
+    ln -sf /usr/bin/chromium /root/.bbot/tools/chrome-linux/chrome; \
     bbot --version >/dev/null; \
     bbot --dry-run -t example.com -m wafw00f,paramminer_getparams,lightfuzz,sslcert,gowitness >/dev/null 2>&1 || true; \
     bbot --dry-run -t example.com -m wafw00f,paramminer_getparams,lightfuzz,sslcert,gowitness --no-color >/tmp/bbot-dry.log 2>&1 || true; \

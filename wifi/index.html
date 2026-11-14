@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WiFi workspace</title>
+<style>
+  :root { --bg:#0b0d10; --panel:#14181d; --line:#232a31; --fg:#e6edf3; --dim:#8b949e;
+          --acc:#4c9aff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex; gap:14px; align-items:center; }
+  header h1 { font-size:14px; margin:0; font-weight:600; letter-spacing:.04em; }
+  header .meta { color:var(--dim); font-size:11px; }
+  button { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:6px;
+           padding:5px 10px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--acc); }
+  button:disabled { opacity:.45; cursor:default; }
+  button.primary { border-color:var(--acc); color:var(--acc); }
+  main { padding:16px 18px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--dim); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+  td.ssid { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sec span { border:1px solid var(--line); border-radius:4px; padding:1px 5px; margin-right:4px; font-size:11px; color:var(--dim); }
+  .h-handshake, .h-pmkid, .h-cracked { color:var(--ok); }
+  .h-partial { color:var(--warn); }
+  .h-beacon-only, .h-not-captured { color:var(--dim); }
+  .banner { padding:8px 18px; background:#1d2419; color:var(--warn); border-bottom:1px solid var(--line); font-size:12px; }
+  .chip { font-size:11px; padding:2px 7px; border-radius:10px; border:1px solid var(--line); color:var(--dim); }
+  .chip.up { color:var(--ok); border-color:var(--ok); }
+  .chip.down { color:var(--bad); border-color:var(--bad); }
+  .psk { color:var(--ok); font-weight:600; }
+  .empty { color:var(--dim); padding:24px 0; }
+  #jobs { margin-top:22px; }
+  .job { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:8px; background:var(--panel); }
+  .bar { height:5px; background:var(--line); border-radius:3px; overflow:hidden; margin:7px 0; }
+  .bar i { display:block; height:100%; background:var(--acc); width:0; }
+  .dim { color:var(--dim); }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<header>
+  <h1>WIFI WORKSPACE</h1>
+  <span class="meta" id="tools">checking tools…</span>
+  <span class="chip" id="agent">agent …</span>
+  <span style="flex:1"></span>
+  <button id="scan">scan around</button>
+  <button id="refresh">rescan files</button>
+</header>
+<div class="banner">Capture puts the Mac's WiFi card in monitor mode — <b>internet drops while it runs</b>. The dashboard itself keeps working.</div>
+<main>
+  <p class="dim">Drop <b>.cap / .pcap / .pcapng / .22000</b> into <code>artex/data/wifi/</code>, then rescan.
+     Capture happens outside the container — PortaPack IQ decoded to pcap, or a monitor-mode dongle.</p>
+  <table>
+    <thead><tr><th>SSID</th><th>BSSID</th><th>ch</th><th>rssi</th><th>security</th><th>capture</th><th></th></tr></thead>
+    <tbody id="rows"><tr><td colspan="7" class="empty">no captures found</td></tr></tbody>
+  </table>
+  <div id="jobs"></div>
+</main>
+<script>
+const rows = document.getElementById('rows');
+const jobsEl = document.getElementById('jobs');
+const toolsEl = document.getElementById('tools');
+let last = [];
+
+const call = (p, b) => fetch(p, b ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(b)} : {})
+  .then(r => r.json().then(j => ({ok:r.ok, j})));
+
+function jobFor(bssid) { return last.find ? null : null; }
+
+function render(nets) {
+  tooltip = null;
+  if (!nets.length) { rows.innerHTML = '<tr><td colspan="7" class="empty">no captures found</td></tr>'; return; }
+  rows.innerHTML = nets.map(n => `
+    <tr data-bssid="${n.bssid}">
+      <td class="ssid">${esc(n.ssid) || '<span class="dim">(hidden)</span>'}</td>
+      <td class="dim">${n.bssid}</td>
+      <td>${esc(n.channel) || '—'}</td>
+      <td>${n.rssi ?? '—'}</td>
+      <td class="sec">${n.security.map(s => `<span>${esc(s)}</span>`).join('')}</td>
+      <td class="h-${n.health}">${n.health}</td>
+      <td>
+        ${n.psk ? `<span class="psk">${esc(n.psk)}</span>` : ''}
+        ${!n.handshake && n.channel ? `<button data-act="capture" data-ch="${esc(n.channel)}">capture 90s</button>` : ''}
+        ${!n.psk ? `<button data-act="crack" ${n.handshake ? '' : 'disabled'}>crack</button>` : ''}
+        <button data-act="handoff" ${n.psk || n.handshake ? '' : 'disabled'}>→ task</button>
+      </td>
+    </tr>`).join('');
+}
+
+const esc = s => (s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load() {
+  const {j} = await call('/api/networks');
+  last = j.networks || [];
+  const ag = j.agent || {};
+  const chip = document.getElementById('agent');
+  chip.textContent = ag.up ? (ag.running ? `capturing ch ${ag.channel}` : 'agent ready') : 'agent off';
+  chip.className = 'chip ' + (ag.up ? 'up' : 'down');
+  document.getElementById('scan').disabled = !ag.up;
+  render(last);
+  const {j: jh} = await call('/api/health');
+  toolsEl.textContent = Object.entries(jh.tools || {}).map(([k, v]) => `${k}:${v ? 'ok' : 'MISSING'}`).join('  ');
+}
+
+async function jobs() {
+  const {j} = await call('/api/jobs');
+  const live = (j.jobs || []).filter(x => x.state === 'running' || x.state === 'cracked' || x.state === 'error');
+  jobsEl.innerHTML = live.map(x => `
+    <div class="job">
+      <div>${x.bssid} · <b>${x.state}</b> · ${esc(x.step)}</div>
+      <div class="bar"><i style="width:${x.pct || 0}%"></i></div>
+      <div class="dim">${(x.speed ? Math.round(x.speed) + ' H/s' : '')} ${x.eta ? '· eta ' + x.eta : ''} ${x.pct ? '· ' + x.pct + '%' : ''}</div>
+      ${x.result ? `<div class="psk">PSK: ${esc(x.result)}</div>` : ''}
+      ${x.state === 'running' ? `<button data-stop="${x.id}">stop</button>` : ''}
+    </div>`).join('');
+}
+
+document.addEventListener('click', async e => {
+  const t = e.target;
+  if (t.id === 'refresh') return load();
+  if (t.id === 'scan') { t.disabled = true; await call('/api/scan', {}); t.disabled = false; return load(); }
+  if (t.dataset.stop) return call('/api/stop', {id: t.dataset.stop}).then(jobs);
+  const tr = t.closest('tr');
+  if (!tr || !t.dataset.act) return;
+  const bssid = tr.dataset.bssid;
+  t.disabled = true;
+  if (t.dataset.act === 'capture') {
+    const {ok, j} = await call('/api/capture', {bssid, channel: t.dataset.ch, seconds: 90});
+    if (!ok) alert('capture failed: ' + (j.error || ''));
+    else { t.textContent = 'capturing…'; setTimeout(() => { load(); }, 92000); }
+    t.disabled = false;
+  }
+  if (t.dataset.act === 'crack') { await call('/api/crack', {bssid}); jobs(); load(); }
+  if (t.dataset.act === 'handoff') {
+    const {ok, j} = await call('/api/handoff', {bssid});
+    alert(ok ? 'task #' + j.id + ' created in ARTEX' : 'handoff failed: ' + (j.error || ''));
+    t.disabled = false;
+  }
+});
+
+load();
+setInterval(() => { jobs(); }, 2500);
+setInterval(() => { if (!document.hidden) load(); }, 8000);
+</script>
+</body>
+</html>

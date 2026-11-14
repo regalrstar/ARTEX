@@ -34,6 +34,7 @@ services:
       ARTEX_LLM_MODEL: ${ARTEX_LLM_MODEL:-}
       ARTEX_LLM_BASE_URL: ${ARTEX_LLM_BASE_URL:-}
       ARTEX_LLM_PROXY: ${ARTEX_LLM_PROXY:-}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
       ARTEX_JWT_KEY_DIR: /app/keys
       ARTEX_TRUSTED_PROXIES: ${ARTEX_TRUSTED_PROXIES:-}
     ports:
@@ -50,6 +51,33 @@ services:
       # skill changes require no image rebuild — the container reads the host copy.
       - ./skills:/app/skills
     restart: unless-stopped
+
+  # Offline WiFi workspace (capture triage + cracking). Reuses the artex image for
+  # tshark/hcxtools/hashcat; no radio of its own, files only.
+  wifi:
+    image: artex:local
+    entrypoint: ["python3", "/opt/wifi/server.py"]
+    depends_on:
+      - artex
+    environment:
+      ARTEX_URL: http://artex:8787
+      ARTEX_PASS: ${ARTEX_ADMIN_PASSWORD:-}
+      WIFI_DATA: /data
+      WIFI_WORDLISTS: /wordlists
+    ports:
+      - "127.0.0.1:8790:8790"
+    volumes:
+      - ./wifi:/opt/wifi:ro
+      - ./data/wifi:/data
+      - ./data/wordlists:/wordlists:ro
+    restart: unless-stopped
+
+  # Deliberately vulnerable target for dry runs. Remove when not needed.
+  lab:
+    image: bkimminich/juice-shop:latest
+    # no published port: workers reach it as http://lab:3000 on the compose network
+    restart: unless-stopped
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "2" } }
 
 volumes:
   pgdata:

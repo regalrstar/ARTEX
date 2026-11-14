@@ -3,8 +3,9 @@ package server
 import "os"
 
 // secretEnv lists the credentials read from the environment only at startup:
-// ARTEX_PG_DSN by NewManager, the API keys by agent.FromEnv inside New.
-var secretEnv = []string{"ARTEX_PG_DSN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"}
+// ARTEX_PG_DSN by NewManager, the API keys by agent.FromEnv inside New, and
+// TYPESAFE_API_KEY by intercept.SeedTypeSafeKeyFromEnv.
+var secretEnv = []string{"ARTEX_PG_DSN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "TYPESAFE_API_KEY"}
 
 // ScrubSecretEnv removes secretEnv from the process environment once startup has
 // read it. Child processes (agent shells, custom tools, MCP stdio servers) copy

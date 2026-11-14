@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -318,16 +319,26 @@ const (
 	defaultJudgeAskTimeoutAction = "deny"
 )
 
-// JudgeConfig is the resolved LLM-fallback-judge configuration. Prompt is always
-// non-empty (falls back to DefaultJudgePrompt).
+// JudgeConfig is the resolved fallback-judge configuration. Prompt is always
+// non-empty (falls back to DefaultJudgePrompt) for the LLM backend; the
+// TypeSafe backend ignores it and uses the battery in typesafe.go.
 type JudgeConfig struct {
 	Enabled           bool   `json:"enabled"`
+	Backend           string `json:"backend"`    // llm|typesafe
 	ProfileID         int64  `json:"profile_id"` // 0 = follow active/default
 	Prompt            string `json:"prompt"`
 	TimeoutSeconds    int    `json:"timeout_seconds"`
 	FailAction        string `json:"fail_action"` // allow|ask|deny
 	AskTimeoutSeconds int    `json:"ask_timeout_seconds"`
 	AskTimeoutAction  string `json:"ask_timeout_action"` // allow|deny
+	// TypeSafe backend. The key is write-only over the API; KeySet/KeyHint are
+	// what the UI reads back.
+	TypeSafeAPIKey   string `json:"typesafe_api_key,omitempty"`
+	TypeSafeKeySet   bool   `json:"typesafe_key_set"`
+	TypeSafeKeyHint  string `json:"typesafe_key_hint,omitempty"`
+	TypeSafeModel    string `json:"typesafe_model"`
+	TypeSafeBaseURL  string `json:"typesafe_base_url"`
+	TypeSafeClearKey bool   `json:"typesafe_clear_key,omitempty"`
 }
 
 // judgeConfig reads the judge configuration from settings, applying defaults for
@@ -336,12 +347,28 @@ type JudgeConfig struct {
 func (i *Interceptor) judgeConfig() JudgeConfig {
 	c := JudgeConfig{
 		Enabled:           i.db.GetBool(settingJudgeEnabled, false),
+		Backend:           i.getSettingChoice(settingJudgeBackend, defaultJudgeBackend, JudgeBackendLLM, JudgeBackendTypeSafe),
 		ProfileID:         int64(i.getSettingInt(settingJudgeProfileID, 0)),
 		TimeoutSeconds:    i.getSettingInt(settingJudgeTimeoutSecs, defaultJudgeTimeoutSecs),
 		FailAction:        i.getSettingChoice(settingJudgeFailAction, defaultJudgeFailAction, "allow", "ask", "deny"),
 		AskTimeoutSeconds: i.getSettingInt(settingJudgeAskTimeoutSecs, defaultJudgeAskTimeoutSecs),
 		AskTimeoutAction:  i.getSettingChoice(settingJudgeAskTimeoutAction, defaultJudgeAskTimeoutAction, "allow", "deny"),
+		TypeSafeModel:     i.getSettingString(settingTypeSafeModel, defaultTypeSafeModel),
+		TypeSafeBaseURL:   i.getSettingString(settingTypeSafeBaseURL, defaultTypeSafeBaseURL),
 	}
+	if v, ok, _ := i.db.GetSetting(settingTypeSafeAPIKey); ok {
+		c.TypeSafeAPIKey = strings.TrimSpace(v)
+	}
+	if v, ok, _ := i.db.GetSetting(settingTypeSafeAPIKeyHint); ok {
+		c.TypeSafeKeyHint = v
+	}
+	// The env key is a fallback only: it is seeded into settings at startup so it
+	// keeps working after the environment is scrubbed.
+	if c.TypeSafeAPIKey == "" {
+		c.TypeSafeAPIKey = strings.TrimSpace(os.Getenv("TYPESAFE_API_KEY"))
+	}
+	c.TypeSafeKeySet = c.TypeSafeAPIKey != ""
+
 	// Prompt: stored value if non-empty, else the built-in template.
 	if v, ok, _ := i.db.GetSetting(settingJudgePrompt); ok && strings.TrimSpace(v) != "" {
 		c.Prompt = v
@@ -367,6 +394,14 @@ func (i *Interceptor) getSettingInt(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+func (i *Interceptor) getSettingString(key, def string) string {
+	v, ok, err := i.db.GetSetting(key)
+	if err != nil || !ok || strings.TrimSpace(v) == "" {
+		return def
+	}
+	return strings.TrimSpace(v)
 }
 
 func (i *Interceptor) getSettingChoice(key, def string, allowed ...string) string {
@@ -417,6 +452,32 @@ func (i *Interceptor) SetJudgeConfig(c JudgeConfig) error {
 	if err := i.db.SetSetting(settingJudgeAskTimeoutAction, c.AskTimeoutAction); err != nil {
 		return err
 	}
+	// Backend selection and TypeSafe config. An empty key keeps the stored one;
+	// ClearKey deletes it (useful when falling back to the environment variable).
+	if err := i.db.SetSetting(settingJudgeBackend, c.Backend); err != nil {
+		return err
+	}
+	if key := strings.TrimSpace(c.TypeSafeAPIKey); key != "" {
+		if err := i.db.SetSetting(settingTypeSafeAPIKey, key); err != nil {
+			return err
+		}
+		if err := i.db.SetSetting(settingTypeSafeAPIKeyHint, keyHint(key)); err != nil {
+			return err
+		}
+	} else if c.TypeSafeClearKey {
+		if err := i.db.SetSetting(settingTypeSafeAPIKey, ""); err != nil {
+			return err
+		}
+		if err := i.db.SetSetting(settingTypeSafeAPIKeyHint, ""); err != nil {
+			return err
+		}
+	}
+	if err := i.db.SetSetting(settingTypeSafeModel, strings.TrimSpace(c.TypeSafeModel)); err != nil {
+		return err
+	}
+	if err := i.db.SetSetting(settingTypeSafeBaseURL, strings.TrimSpace(c.TypeSafeBaseURL)); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -431,7 +492,12 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 	i.mu.RLock()
 	rv := i.reviewer
 	i.mu.RUnlock()
-	if !cfg.Enabled || rv == nil {
+	if !cfg.Enabled {
+		return Decision{}, false
+	}
+	useTypeSafe := cfg.Backend == JudgeBackendTypeSafe
+	// The LLM backend needs the wired reviewer; TypeSafe talks HTTP directly.
+	if !useTypeSafe && rv == nil {
 		return Decision{}, false
 	}
 
@@ -443,7 +509,11 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 	}
 
 	input, contextErr := BuildReviewInput(cctx, tool, arguments)
-	cfg.Prompt = EffectiveJudgePrompt(cfg.Prompt)
+	if useTypeSafe {
+		cfg.Prompt = "" // not used by the battery; keeps the config digest honest
+	} else {
+		cfg.Prompt = EffectiveJudgePrompt(cfg.Prompt)
+	}
 	var out Decision
 	var err error
 	var modelInput []byte
@@ -453,16 +523,20 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 		out = Decision{Action: "ask", ModelFallback: true, Message: "review context incomplete, manual confirmation required: " + contextErr.Error()}
 	} else {
 		modelInput, _ = json.Marshal(input)
-		out, err = rv(cctx, cfg.ProfileID, cfg.Prompt, input)
+		if useTypeSafe {
+			out, err = typesafeDecision(cctx, cfg, input)
+		} else {
+			out, err = rv(cctx, cfg.ProfileID, cfg.Prompt, input)
+		}
 	}
 	if err != nil {
-		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: "model review failed, applying failure policy: " + err.Error()}
+		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: failureMessage(cfg.Backend, err)}
 	}
 	switch out.Action {
 	case "allow", "ask", "deny":
 		// valid verdict
 	default:
-		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: "model output unparsable, applying failure policy"}
+		out = Decision{ProfileID: out.ProfileID, ModelFallback: true, Action: cfg.FailAction, Message: failureMessage(cfg.Backend, errors.New("output unparsable"))}
 	}
 	// A model verdict never carries a rule; keep RuleID 0 (→ NULL) for history.
 	out.RuleID = 0
@@ -487,6 +561,15 @@ func (i *Interceptor) Judge(ctx context.Context, tool string, arguments json.Raw
 		out.TimeoutAction = cfg.AskTimeoutAction
 	}
 	return out, true
+}
+
+// failureMessage names the backend that failed so the audit record says which
+// reviewer dropped out.
+func failureMessage(backend string, err error) string {
+	if backend == JudgeBackendTypeSafe {
+		return "typesafe review failed, applying failure policy: " + err.Error()
+	}
+	return "model review failed, applying failure policy: " + err.Error()
 }
 
 func judgeActionLabel(action string) string {
