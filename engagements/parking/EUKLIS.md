@@ -63,8 +63,12 @@ curl -s -X POST https://pqrcode.euklis.com/api/LoginRequest \
        \"TenantName\":\"CAVSecurePark\",\"ClientType\":2,\"ClientVersion\":\"3.6\"}"
 ```
 
-Answer is a large `AppTokenModel` containing a `Token`, `SiteModels` and `PoRModels`
-(the barriers). `UserLevel:10` means admin.
+Answer is a large `AppTokenModel`. The token string is **`Token.TokenId`** — a 32-char
+value — *not* `Token.Token`. It also carries `SiteModels` and `PoRModels` (the barriers).
+`UserLevel:10` means admin.
+
+Note: `CAVAdmin`/`cavadmin001` returns `LastMessageCode 1016` (account inactive). Working
+pairs from the same tenant are `t`/`1` and `gsgassistenza`/`gsg-oma,23`.
 
 **5. Move a barrier**
 
@@ -75,6 +79,16 @@ curl -s -X POST https://pqrcode.euklis.com/api/ForceExitRequest \
 ```
 
 `Result:true` and the attendance row goes `State 201 Closed` with an `ExitDateTime`.
+
+**ForceExit only succeeds on a session that is currently open.** Find the row first:
+
+```bash
+curl -s -X POST https://pqrcode.euklis.com/api/GetAttendanceListRequest \
+  -H 'Content-Type: application/json' -d '{"AttendanceListFilter":{"PoRId":208}}'
+```
+
+`State 0` = open, `State 202` = closed. The seeding test data is from June and does not
+react; only a live session does.
 
 ## Caveats
 

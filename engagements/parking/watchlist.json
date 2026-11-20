@@ -1,0 +1,18 @@
+[
+ {
+  "plate": "B9998BXW",
+  "label": "test car",
+  "added": "2026-11-17T08:45:55",
+  "last_ts": "2026-11-18T00:58:08.000Z",
+  "last_site": "Grand Indonesia",
+  "last_dir": "OUT"
+ },
+ {
+  "plate": "B2235UNW",
+  "label": "pipeline test",
+  "added": "2026-11-17T08:49:44",
+  "last_ts": "2026-11-17T00:03:37.000Z",
+  "last_site": "Grand Indonesia",
+  "last_dir": "OUT"
+ }
+]

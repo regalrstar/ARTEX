@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Parking console</title>
+<style>
+:root{--bg:#0b0d10;--p:#14181d;--l:#232a31;--f:#e6edf3;--d:#8b949e;--a:#4c9aff;--ok:#3fb950;--w:#d29922;--b:#f85149}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--f);font:13px/1.5 ui-monospace,Menlo,monospace}
+header{display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--l)}
+h1{font-size:13px;margin:0;letter-spacing:.05em}
+button{background:var(--p);color:var(--f);border:1px solid var(--l);border-radius:6px;padding:6px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--a)}button:disabled{opacity:.4}
+input,select{background:var(--p);color:var(--f);border:1px solid var(--l);border-radius:6px;padding:6px 8px;font:inherit}
+main{display:grid;grid-template-columns:300px 1fr;height:calc(100dvh - 48px)}
+aside{border-right:1px solid var(--l);overflow:auto;padding:10px}
+section{padding:12px;overflow:auto}
+.tabs{display:flex;gap:6px;margin-bottom:8px}.tab{padding:4px 8px;border:1px solid var(--l);border-radius:6px;cursor:pointer}
+.tab.on{border-color:var(--a);color:var(--a)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{text-align:left;padding:6px;border-bottom:1px solid var(--l);vertical-align:middle}
+th{color:var(--d);font-size:10px;text-transform:uppercase}
+.dim{color:var(--d)}.ok{color:var(--ok)}.warn{color:var(--w)}.bad{color:var(--b)}
+img.t{width:88px;height:50px;object-fit:cover;border-radius:4px;border:1px solid var(--l);display:block}
+.row{cursor:pointer}
+.tag{border:1px solid var(--l);border-radius:4px;padding:0 4px;font-size:10px;color:var(--d)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.chip{font-size:11px;padding:1px 6px;border-radius:9px;border:1px solid var(--l);color:var(--d)}
+</style></head><body>
+<header>
+  <h1>PARKING CONSOLE</h1>
+  <span class="chip" id="health">checking…</span>
+  <span style="flex:1"></span>
+  <button id="exp">export csv</button>
+</header>
+<main>
+  <aside>
+    <div class="tabs">
+      <span class="tab on" data-t="plate">plate</span>
+      <span class="tab" data-t="person">person</span>
+      <span class="tab" data-t="watch">watch</span>
+      <span class="tab" data-t="feed">feed</span>
+    </div>
+
+    <div id="pane-plate">
+      <div class="bar"><input id="plate" placeholder="B66REG" style="flex:1">
+        <button id="go">run</button></div>
+      <label class="dim"><input type="checkbox" id="prefix"> prefix match</label>
+      <label class="dim" style="margin-left:10px"><input type="checkbox" id="agents" checked> include site agents (slow)</label>
+      <div class="bar" style="margin-top:8px">
+        <input id="days" type="number" value="3" min="1" max="470" style="width:70px">
+        <span class="dim" style="align-self:center">days back</span>
+      </div>
+      <p class="dim" style="font-size:11px">Sites: leave blank for all live agents, or pick below.</p>
+      <input id="siteq" placeholder="filter sites…">
+      <div id="sites" class="dim" style="font-size:11px;margin-top:6px;max-height:45vh;overflow:auto"></div>
+    </div>
+
+    <div id="pane-person" hidden>
+      <input id="pq" placeholder="name / phone / email / tax code" style="width:100%">
+      <button id="pgo" style="margin-top:8px">search identity</button>
+      <div id="pinfo" class="dim" style="font-size:11px;margin-top:8px"></div>
+    </div>
+
+    <div id="pane-watch" hidden>
+      <button id="poll">poll now</button>
+      <div class="dim" style="font-size:11px;margin:6px 0">alerts refresh automatically every 20s</div>
+      <div id="wlist" class="dim"></div>
+      <h3 style="font-size:11px;margin:12px 0 4px;color:var(--d)">ALERTS</h3>
+      <div id="alerts" style="font-size:11px"></div>
+    </div>
+    <div id="pane-feed" hidden><button id="fgo">latest activity</button></div>
+  </aside>
+
+  <section>
+    <div id="hdr" class="dim">Enter a plate and run.</div>
+    <table><thead><tr><th>photo</th><th>time (WIB)</th><th>dir</th><th>site</th><th>gate</th><th>vehicle</th></tr></thead>
+      <tbody id="out"></tbody></table>
+  </section>
+</main>
+<script>
+const $=s=>document.querySelector(s), api=(p,b)=>fetch(p,b?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}:{}).then(r=>r.json());
+const wib=t=>{const d=new Date(t);return isNaN(d)?'—':new Date(d.getTime()+7*3600e3).toISOString().slice(0,16).replace('T',' ')};
+let sites=[], chosen=new Set(), last=[];
+const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function boot(){
+  const a=await api('/api/agents'); $('#health').textContent=a.ports.length+' agents live'; $('#health').className='chip ok';
+  const r=await api('/api/locations?q='); sites=r.items.filter(x=>!x.deleted&&x.port);
+  drawSites();
+}
+function drawSites(){
+  const q=$('#siteq').value.toLowerCase();
+  $('#sites').innerHTML=sites.filter(s=>!q||(s.title||'').toLowerCase().includes(q)||(s.addr||'').toLowerCase().includes(q))
+    .map(s=>`<label style="display:block"><input type="checkbox" value="${s.port}" ${chosen.has(s.port)?'checked':''}> ${esc(s.title)}</label>`).join('')
+    || '<span class="dim">no sites</span>';
+  $('#sites').querySelectorAll('input').forEach(i=>i.onchange=()=>i.checked?chosen.add(i.value):chosen.delete(i.value));
+}
+$('#siteq').oninput=drawSites;
+
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  for(const k of ['plate','person','watch','feed']) $('#pane-'+k).hidden = k!==t.dataset.t;
+  if(t.dataset.t==='watch') loadWatch(); if(t.dataset.t==='feed') $('#hdr').textContent='Press latest activity.';
+});
+
+$('#go').onclick=async()=>{
+  const plate=$('#plate').value.trim(); if(!plate) return;
+  $('#hdr').textContent='searching…'; $('#out').innerHTML='';
+  const body={plate, days:parseInt($('#days').value||'3'), prefix:$('#prefix').checked, agents:$('#agents').checked};
+  if(chosen.size) body.ports=[...chosen];
+  const r=await api('/api/search',body); last=r.items||[];
+  $('#hdr').innerHTML=`<b>${r.count}</b> events across <b>${r.sites}</b> sites for ${esc(plate.toUpperCase())}`;
+  $('#out').innerHTML=last.map(render).join('')||'<tr><td colspan="6" class="dim">no records</td></tr>';
+};
+function render(r){
+  const v=[r.brand,r.model,r.color].filter(Boolean).join(' ')||'<span class="dim">—</span>';
+  const photo=r.photo?`<a href="${r.photo}" target="_blank"><img class="t" src="/api/thumb?u=${encodeURIComponent(r.photo)}"></a>`
+    :'<span class="dim">no image</span>';
+  const flags=[r.collision?'<span class="tag warn">collision</span>':''].join(' ');
+  return `<tr><td>${photo}</td><td>${wib(r.ts)}</td><td class="${r.dir==='IN'?'ok':'dim'}">${r.dir}</td>
+    <td>${esc(r.site)} ${flags}</td><td>${esc(r.gate)||'—'}</td><td>${v}
+    <button data-track="${esc(r.plate)}" style="padding:1px 5px;font-size:10px">track</button></td></tr>`;
+}
+
+$('#pgo').onclick=async()=>{
+  const r=await api('/api/person',{q:$('#pq').value});
+  $('#pinfo').innerHTML=(r.items||[]).map(p=>`<div style="margin-bottom:6px">${esc(p.name)||'<i>unnamed</i>'} · ${esc(p.phone)||'—'}<br>
+    <span class="dim">${esc(p.email)||''} ${esc(p.tax)?'· '+esc(p.tax):''}</span>
+    <button data-id="${p.id}" class="cr">plates</button></div>`).join('')||'no match';
+  $('#pinfo').querySelectorAll('.cr').forEach(b=>b.onclick=async()=>{
+    const d=await api('/api/identity',{id:b.dataset.id});
+    $('#pinfo').innerHTML='<b>credentials</b><br>'+(d.items||[]).map(c=>`${c.plate?esc(c.plate)+' plate':'code '+esc(c.code)}`).join('<br>');
+  });
+};
+
+function loadWatch(){
+  api('/api/watch').then(r=>{
+    $('#wlist').innerHTML=(r.items||[]).map(w=>`<div style="margin-bottom:4px">${esc(w.plate)}
+      <span class="dim">${esc(w.label)||''} ${esc(w.last_site)||''}</span>
+      <button data-p="${w.plate}" class="del">×</button></div>`).join('')||'empty';
+    $('#wlist').querySelectorAll('.del').forEach(b=>b.onclick=async()=>{
+      await fetch('/api/watch/'+b.dataset.p,{method:'DELETE'}); loadWatch();});
+  });
+  api('/api/alerts').then(r=>{
+    $('#alerts').innerHTML=(r.items||[]).map(a=>`<div style="margin-bottom:5px">
+      <span class="${a.kind==='MOVED'?'warn':a.kind==='DWELL5H'?'bad':'ok'}">${esc(a.kind)}</span>
+      <b>${esc(a.plate)}</b> ${esc(a.site)||''} ${esc(a.gate)||''}
+      <div class="dim">${wib(a.ts)} ${esc(a.note)||''}</div></div>`).join('')||'no alerts yet';
+  });
+}
+setInterval(()=>{ if(!$('#pane-watch').hidden) loadWatch(); }, 20000);
+$('#fgo').onclick=async()=>{
+  const r=await api('/api/feed',{});
+  $('#hdr').textContent='latest activity across live sites';
+  $('#out').innerHTML=(r.items||[]).map(x=>`<tr><td class="dim">—</td><td>${wib(x.ts)}</td><td class="ok">IN</td>
+    <td>${esc(x.site)}</td><td>${esc(x.gate)}</td><td class="dim">—</td></tr>`).join('');
+};
+$('#poll').onclick=async()=>{ $('#poll').disabled=true; await api('/api/poll',{}); $('#poll').disabled=false; loadWatch(); };
+$('#exp').onclick=()=>location.href='/api/export';
+boot();
+</script></body></html>

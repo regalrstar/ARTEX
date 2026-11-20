@@ -1,0 +1,162 @@
+[
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GCBM1",
+  "direction": "IN",
+  "ts": "2026-10-18T14:25:00.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GCBM1_B66REG_BMW_X7_black_67-0-334-129_2026-10-18T14:25:00.jpg",
+  "open": false,
+  "raw_id": 13284262
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "LGBK1",
+  "direction": "OUT",
+  "ts": "2026-10-18T16:26:05.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/LGBK1_B66REG_BMW_X2 (F39)_white-silver_105-1-336-89_2026-10-18T16:26:05.jpg",
+  "open": false,
+  "raw_id": 13284262
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GCBM2",
+  "direction": "IN",
+  "ts": "2026-10-21T18:35:27.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GCBM2_B66REG_brand_model_color_0-0-0-0_2026-10-21T18:35:27.jpg",
+  "open": false,
+  "raw_id": 13350909
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GEBM1",
+  "direction": "IN",
+  "ts": "2026-10-21T19:08:10.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GEBM1_B66REG_BMW_X2_red_23-16-247-146_2026-10-21T19:08:09.jpg",
+  "open": false,
+  "raw_id": 13351609
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GGBK1",
+  "direction": "OUT",
+  "ts": "2026-10-21T20:56:17.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GGBK1_B66REG_BMW_X2_red_0-0-0-0_2026-10-21T20:56:17.jpg",
+  "open": false,
+  "raw_id": 13351609
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GEBM1",
+  "direction": "IN",
+  "ts": "2026-10-21T20:57:18.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GEBM1_B66REG_BMW_X7_red_23-16-250-145_2026-10-21T20:57:18.jpg",
+  "open": false,
+  "raw_id": 13353045
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GEBM1",
+  "direction": "IN",
+  "ts": "2026-10-21T20:57:18.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GEBM1_B66REG_BMW_X7_red_23-16-250-145_2026-10-21T20:57:18.jpg",
+  "open": false,
+  "raw_id": 13353045
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GFBK2",
+  "direction": "OUT",
+  "ts": "2026-10-21T23:05:15.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GFBK2_B66REG_BMW_X7_red_299-0-663-183_2026-10-21T23:05:14.jpg",
+  "open": false,
+  "raw_id": 13350909
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GGBK1",
+  "direction": "OUT",
+  "ts": "2026-10-22T20:58:37.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GGBK1_B66REG_brand_model_color_0-0-0-0_2026-10-22T20:58:37.jpg",
+  "open": false,
+  "raw_id": 13353045
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GGBK1",
+  "direction": "OUT",
+  "ts": "2026-10-22T20:58:37.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GGBK1_B66REG_brand_model_color_0-0-0-0_2026-10-22T20:58:37.jpg",
+  "open": false,
+  "raw_id": 13353045
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GEBM1",
+  "direction": "IN",
+  "ts": "2026-10-25T19:37:24.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GEBM1_B66REG_BMW_3 Series_black_32-5-231-161_2026-10-25T19:37:24.jpg",
+  "open": false,
+  "raw_id": 13414160
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "LGBK2",
+  "direction": "OUT",
+  "ts": "2026-10-25T19:48:30.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/LGBK2_B66REG_BMW_X5 (G05)_red_10-2-282-170_2026-10-25T19:48:30.jpg",
+  "open": false,
+  "raw_id": 13414160
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GCBM1",
+  "direction": "IN",
+  "ts": "2026-10-26T17:21:01.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GCBM1_B66REG_BMW_X6_black_56-30-347-243_2026-10-26T17:21:00.jpg",
+  "open": false,
+  "raw_id": 13430648
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GFBK2",
+  "direction": "OUT",
+  "ts": "2026-10-26T18:35:31.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GFBK2_B66REG_BMW_X6_black_314-0-668-189_2026-10-26T18:35:31.jpg",
+  "open": false,
+  "raw_id": 13430648
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GEBM1",
+  "direction": "IN",
+  "ts": "2026-11-12T02:13:51.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GEBM1_B66REG_BMW_rocky_black_125-135-324-297_2026-11-12T09:13:51.jpg",
+  "open": false,
+  "raw_id": 13797107
+ },
+ {
+  "source": "lpr-engine",
+  "plate": "B66REG",
+  "gate": "GFBK2",
+  "direction": "OUT",
+  "ts": "2026-11-12T02:36:01.000Z",
+  "photo": "https://district8.lpr-capture.alfabeta.co.id/snapshot/GFBK2_B66REG_TOYOTA_hilux_black_868-125-1221-354_2026-11-12T09:36:01.jpg",
+  "open": false,
+  "raw_id": 13797107
+ }
+]
