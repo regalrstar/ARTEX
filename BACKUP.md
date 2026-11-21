@@ -5,7 +5,7 @@
 | Data | Where |
 | --- | --- |
 | Source code, docs, deploy/wifi/engagement scripts | `fork` remote → `github.com/regalrstar/ARTEX` (branch `feat/local-work-recovery`) and commit history in `origin` |
-| `data/` (traffic, tasks, transcripts, wordlists), `.env`, `skills/`, `engagements/`, and the standalone pipeline project | Encrypted archive — GitHub release `regalrstar/ARTEX@backup-20261120` (primary, split into parts) and iCloud Drive `~/Library/Mobile Documents/com~apple~CloudDocs/artex-backup/` (secondary) |
+| `data/` (traffic, tasks, transcripts, wordlists), `.env`, `skills/`, `engagements/`, and the standalone pipeline project | External drive `/Volumes/My Passport/artex-backup/` (primary, verified) — encrypted archive; also mirrored to GitHub release `regalrstar/ARTEX@backup-20261120` |
 | Personal skills | Committed in this repo's `skills/` and in `regalrstar/The-Brown-Death` `skills/` |
 | `web/node_modules`, `web/.next` | Not backed up (regenerable); excluded from Time Machine |
 
@@ -43,12 +43,22 @@ rollback point for anything deleted since.
 
 ## Time Machine
 
-No destination is configured. Attach an external disk, then:
+`My Passport` is the intended destination (APFS, 889 GB free). Register it via
+System Settings → General → Time Machine → Add Backup Disk; enabling it from a shell
+needs Full Disk Access, which `OpenCode.app` does not have.
+
+Then verify and run:
 
 ```sh
-diskutil list                      # identify the volume
-sudo tmutil setdestination -a /Volumes/<VOLUME>
+tmutil destinationinfo
 sudo tmutil startbackup --auto
 ```
 
 Already excluded: `web/node_modules`. `data/` is **included** — keep it that way.
+
+## iCloud (currently unreliable)
+
+The 2026-11-14 archive in `~/Library/Mobile Documents/com~apple~CloudDocs/artex-backup/`
+was evicted by optimize-storage and now has zero data blocks (`stat` → `blocks:0`), and
+uploads to iCloud have been stalled since 2026-11-14. Treat iCloud as unavailable until
+you re-authenticate iCloud Drive in System Settings.
